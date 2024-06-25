@@ -2,6 +2,9 @@ plugins {
     id 'de.undercouch.download'
 }
 
+
+import groovy.json.JsonBuilder
+import groovy.json.JsonOutput
 import net.minecraftforge.mcpconfig.tasks.*
 import net.neoforged.srgutils.MinecraftVersion
 
@@ -197,7 +200,7 @@ subprojects {
         def manifest = rootProject.downloadVersionManifest.dest
         inputs.file manifest
         def id = version
-        src { 
+        src {
             Utils.init()
             manifest.json.versions.find{ it.id == id }.url
         }
@@ -604,96 +607,85 @@ subprojects {
         }
     }
 
-    task generateConfiguration(type: SingleFileOutput) {
-        inputs.property('config', CONFIG)
-        inputs.property('version', version)
-        inputs.property('fernflower', FERNFLOWER)
-        inputs.property('mergetool', MERGETOOL)
-        inputs.property('renametool', RENAMETOOL)
-        inputs.property('mergemaptool', MERGEMAPTOOL)
-        inputs.property('bundle_extract_jar', BUNDLE_EXTRACT_JAR)
-        inputs.property('java_target', JAVA_TARGET)
-        inputs.property('encoding', ENCODING)
-        dest = file(PATH_CACHED_VERSION_DATA + 'config.json')
+    Provider<RegularFile> configurationBuilder = project.layout.buildDirectory.file('config.json')
+        .map { dest ->
+            def json = new JsonBuilder()
+            def config = CONFIG
 
-        doLast {
-            def json = new groovy.json.JsonBuilder()
-            def config = inputs.properties.config
-            
             if (config.official) {
                 def steps_def = [
-                    joined: [
-                        [type: 'downloadManifest'],
-                        [type: 'downloadJson'],
-                        [type: 'downloadClient'],
-                        [type: 'downloadServer'],
-                        [type: 'downloadClientMappings'],
-                        [type: 'mergeMappings', official: '{downloadClientMappingsOutput}'],
-                        [type: 'strip', name: 'stripClient', input: '{downloadClientOutput}'],
-                        [type: 'strip', name: 'stripServer', input: '{downloadServerOutput}'],
-                        [type: 'merge', client: '{stripClientOutput}', server: '{stripServerOutput}', version: inputs.properties.version],
-                        [type: 'listLibraries'],
-                        [type: 'rename', input: '{mergeOutput}', libraries: '{listLibrariesOutput}', mappings: '{mergeMappingsOutput}'],
-                        [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{renameOutput}'],
-                        [type: 'inject', input: '{decompileOutput}'],
-                        [type: 'patch', input: '{injectOutput}']
-                    ],
-                    client: [
-                        [type: 'downloadManifest'],
-                        [type: 'downloadJson'],
-                        [type: 'downloadClient'],
-                        [type: 'downloadClientMappings'],
-                        [type: 'mergeMappings', official: '{downloadClientMappingsOutput}'],
-                        [type: 'strip', input: '{downloadClientOutput}'],
-                        [type: 'listLibraries'],
-                        [type: 'rename', input: '{stripOutput}', libraries: '{listLibrariesOutput}', mappings: '{mergeMappingsOutput}'],
-                        [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{renameOutput}'],
-                        [type: 'inject', input: '{decompileOutput}'],
-                        [type: 'patch', input: '{injectOutput}']
-                    ],
-                    server: [
-                        [type: 'downloadManifest'],
-                        [type: 'downloadJson'],
-                        [type: 'downloadServer'],
-                        [type: 'downloadClientMappings'],
-                        [type: 'mergeMappings', official: '{downloadClientMappingsOutput}'],
-                        [type: 'strip', input: '{downloadServerOutput}'],
-                        [type: 'listLibraries'],
-                        [type: 'rename', input: '{stripOutput}', libraries: '{listLibrariesOutput}', mappings: '{mergeMappingsOutput}'],
-                        [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{renameOutput}'],
-                        [type: 'inject', input: '{decompileOutput}'],
-                        [type: 'patch', input: '{injectOutput}']
-                    ]
+                        joined: [
+                                [type: 'downloadManifest'],
+                                [type: 'downloadJson'],
+                                [type: 'downloadClient'],
+                                [type: 'downloadServer'],
+                                [type: 'downloadClientMappings'],
+                                [type: 'mergeMappings', official: '{downloadClientMappingsOutput}'],
+                                [type: 'strip', name: 'stripClient', input: '{downloadClientOutput}'],
+                                [type: 'strip', name: 'stripServer', input: '{downloadServerOutput}'],
+                                [type: 'merge', client: '{stripClientOutput}', server: '{stripServerOutput}', version: project.version],
+                                [type: 'listLibraries'],
+                                [type: 'rename', input: '{mergeOutput}', libraries: '{listLibrariesOutput}', mappings: '{mergeMappingsOutput}'],
+                                [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{renameOutput}'],
+                                [type: 'inject', input: '{decompileOutput}'],
+                                [type: 'patch', input: '{injectOutput}']
+                        ],
+                        client: [
+                                [type: 'downloadManifest'],
+                                [type: 'downloadJson'],
+                                [type: 'downloadClient'],
+                                [type: 'downloadClientMappings'],
+                                [type: 'mergeMappings', official: '{downloadClientMappingsOutput}'],
+                                [type: 'strip', input: '{downloadClientOutput}'],
+                                [type: 'listLibraries'],
+                                [type: 'rename', input: '{stripOutput}', libraries: '{listLibrariesOutput}', mappings: '{mergeMappingsOutput}'],
+                                [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{renameOutput}'],
+                                [type: 'inject', input: '{decompileOutput}'],
+                                [type: 'patch', input: '{injectOutput}']
+                        ],
+                        server: [
+                                [type: 'downloadManifest'],
+                                [type: 'downloadJson'],
+                                [type: 'downloadServer'],
+                                [type: 'downloadClientMappings'],
+                                [type: 'mergeMappings', official: '{downloadClientMappingsOutput}'],
+                                [type: 'strip', input: '{downloadServerOutput}'],
+                                [type: 'listLibraries'],
+                                [type: 'rename', input: '{stripOutput}', libraries: '{listLibrariesOutput}', mappings: '{mergeMappingsOutput}'],
+                                [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{renameOutput}'],
+                                [type: 'inject', input: '{decompileOutput}'],
+                                [type: 'patch', input: '{injectOutput}']
+                        ]
                 ]
                 def functions_def = [
-                    decompile: inputs.properties.fernflower.findAll {it.key != 'path'},
-                    merge:     inputs.properties.mergetool.findAll {it.key != 'path'},
-                    rename:    inputs.properties.renametool.findAll {it.key != 'path'},
-                    mergeMappings: inputs.properties.mergemaptool.findAll {it.key != 'path'}
+                        decompile: FERNFLOWER.findAll {it.key != 'path'},
+                        merge:     MERGETOOL.findAll {it.key != 'path'},
+                        rename:    RENAMETOOL.findAll {it.key != 'path'},
+                        mergeMappings: MERGEMAPTOOL.findAll {it.key != 'path'}
                 ]
                 def specVer = 2
-                
-                if (inputs.properties.bundle_extract_jar != null) {
-                    specVer = 3 // Spec v3 adds 'bundle' to the listLibraries task. 
-                    functions_def['bundleExtractJar'] = inputs.properties.bundle_extract_jar.findAll {it.key != 'path'}
+
+                if (BUNDLE_EXTRACT_JAR != null) {
+                    specVer = 3 // Spec v3 adds 'bundle' to the listLibraries task.
+                    functions_def['bundleExtractJar'] = BUNDLE_EXTRACT_JAR.findAll {it.key != 'path'}
                     steps_def['joined'].add(4, [name: 'extractServer', type: 'bundleExtractJar', input: '{downloadServerOutput}'])
-                    steps_def['joined'].find{'stripServer'.equals(it.name) }['input'] = '{extractServerOutput}'
-                    
+                    steps_def['joined'].find{ ('stripServer' == it.name) }['input'] = '{extractServerOutput}'
+
                     steps_def['server'].add(3, [name: 'extractServer', type: 'bundleExtractJar', input: '{downloadServerOutput}'])
-                    steps_def['server'].find{'strip'.equals(it.type) }['input'] = '{extractServerOutput}'
-                    steps_def['server'].find{'listLibraries'.equals(it.type) }['bundle'] = '{downloadServerOutput}'
+                    steps_def['server'].find{ ('strip' == it.type) }['input'] = '{extractServerOutput}'
+                    steps_def['server'].find{ ('listLibraries' == it.type) }['bundle'] = '{downloadServerOutput}'
                 }
 
                 if (functions_def.values().any { it.java_version != null }) {
                     specVer = 4 // Spec v4 adds the ability to set a java version to run a tool with
                 }
-                
+
                 json {
                     spec specVer
-                    version inputs.properties.version
+                    version project.version
                     official config.official
-                    java_target inputs.properties.java_target
-                    encoding inputs.properties.encoding
+                    java_target JAVA_TARGET
+                    encoding ENCODING
                     data {
                         mappings 'config/joined.tsrg'
                         inject 'config/inject/'
@@ -709,49 +701,49 @@ subprojects {
                 }
             } else {
                 def steps_def = [
-                    joined: [
-                        [type: 'downloadManifest'],
-                        [type: 'downloadJson'],
-                        [type: 'downloadClient'],
-                        [type: 'downloadServer'],
-                        [type: 'strip', name: 'stripClient', input: '{downloadClientOutput}'],
-                        [type: 'strip', name: 'stripServer', input: '{downloadServerOutput}'],
-                        [type: 'merge', client: '{stripClientOutput}', server: '{stripServerOutput}', version: project.version],
-                        [type: 'rename', input: '{mergeOutput}'],
-                        [type: 'mcinject', input: '{renameOutput}'],
-                        [type: 'listLibraries'],
-                        [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{mcinjectOutput}'],
-                        [type: 'inject', input: '{decompileOutput}'],
-                        [type: 'patch', input: '{injectOutput}']
-                    ],
-                    client: [
-                        [type: 'downloadManifest'],
-                        [type: 'downloadJson'],
-                        [type: 'downloadClient'],
-                        [type: 'strip', input: '{downloadClientOutput}'],
-                        [type: 'rename', input: '{stripOutput}'],
-                        [type: 'mcinject', input: '{renameOutput}'],
-                        [type: 'listLibraries'],
-                        [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{mcinjectOutput}'],
-                        [type: 'inject', input: '{decompileOutput}'],
-                        [type: 'patch', input: '{injectOutput}']
-                    ],
-                    server: [
-                        [type: 'downloadManifest'],
-                        [type: 'downloadJson'],
-                        [type: 'downloadServer'],
-                        [type: 'strip', input: '{downloadServerOutput}'],
-                        [type: 'rename', input: '{stripOutput}'],
-                        [type: 'mcinject', input: '{renameOutput}'],
-                        [type: 'listLibraries'],
-                        [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{mcinjectOutput}'],
-                        [type: 'inject', input: '{decompileOutput}'],
-                        [type: 'patch', input: '{injectOutput}']
-                    ]
+                        joined: [
+                                [type: 'downloadManifest'],
+                                [type: 'downloadJson'],
+                                [type: 'downloadClient'],
+                                [type: 'downloadServer'],
+                                [type: 'strip', name: 'stripClient', input: '{downloadClientOutput}'],
+                                [type: 'strip', name: 'stripServer', input: '{downloadServerOutput}'],
+                                [type: 'merge', client: '{stripClientOutput}', server: '{stripServerOutput}', version: project.version],
+                                [type: 'rename', input: '{mergeOutput}'],
+                                [type: 'mcinject', input: '{renameOutput}'],
+                                [type: 'listLibraries'],
+                                [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{mcinjectOutput}'],
+                                [type: 'inject', input: '{decompileOutput}'],
+                                [type: 'patch', input: '{injectOutput}']
+                        ],
+                        client: [
+                                [type: 'downloadManifest'],
+                                [type: 'downloadJson'],
+                                [type: 'downloadClient'],
+                                [type: 'strip', input: '{downloadClientOutput}'],
+                                [type: 'rename', input: '{stripOutput}'],
+                                [type: 'mcinject', input: '{renameOutput}'],
+                                [type: 'listLibraries'],
+                                [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{mcinjectOutput}'],
+                                [type: 'inject', input: '{decompileOutput}'],
+                                [type: 'patch', input: '{injectOutput}']
+                        ],
+                        server: [
+                                [type: 'downloadManifest'],
+                                [type: 'downloadJson'],
+                                [type: 'downloadServer'],
+                                [type: 'strip', input: '{downloadServerOutput}'],
+                                [type: 'rename', input: '{stripOutput}'],
+                                [type: 'mcinject', input: '{renameOutput}'],
+                                [type: 'listLibraries'],
+                                [type: 'decompile', libraries: '{listLibrariesOutput}', input: '{mcinjectOutput}'],
+                                [type: 'inject', input: '{decompileOutput}'],
+                                [type: 'patch', input: '{injectOutput}']
+                        ]
                 ]
                 json {
                     spec 1
-                    version inputs.properties.version
+                    version project.version
                     data {
                         access 'config/access.txt'
                         constructors 'config/constructors.txt'
@@ -775,8 +767,23 @@ subprojects {
                     libraries config.libraries
                 }
             }
-            dest.get().getAsFile().text = groovy.json.JsonOutput.prettyPrint(json.toString())
+            dest.getAsFile().getParentFile().mkdirs()
+            Files.deleteIfExists(dest.getAsFile().toPath())
+            dest.getAsFile().text = JsonOutput.prettyPrint(json.toString())
+            return dest
         }
+
+    task generateConfiguration(type: SingleFileOutput) {
+        inputs.property('config', CONFIG)
+        inputs.property('version', version)
+        inputs.property('fernflower', FERNFLOWER)
+        inputs.property('mergetool', MERGETOOL)
+        inputs.property('renametool', RENAMETOOL)
+        inputs.property('mergemaptool', MERGEMAPTOOL)
+        inputs.property('bundle_extract_jar', BUNDLE_EXTRACT_JAR)
+        inputs.property('java_target', JAVA_TARGET)
+        inputs.property('encoding', ENCODING)
+        dest.value configurationBuilder
     }
 
     task makeZip(type: Zip, dependsOn: [generateConfiguration]) {
@@ -818,6 +825,17 @@ subprojects {
     components.add(neoformComponent)
 
     configurations {
+        neoformSdk {
+            canBeResolved = false
+            attributes {
+                attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, JAVA_TARGET)
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, "sdk"))
+            }
+            outgoing {
+                capability "net.neoforged:neoform-sdk:${project.version + '-' + rootProject.TIMESTAMP}"
+            }
+            neoformComponent.addVariantsFromConfiguration(it) {}
+        }
         neoformData {
             canBeResolved = false
             attributes {
@@ -859,6 +877,7 @@ subprojects {
 
     artifacts {
         neoformData makeZip
+        neoformSdk generateConfiguration.dest
     }
 
     TOOLS.each {
